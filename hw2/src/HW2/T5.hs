@@ -35,9 +35,13 @@ extractES :: Except e (Annotated s (ExceptState e s a)) -> ExceptState e s a
 extractES (Error e) = ES {runES = \_ -> Error e}
 extractES (Success (ES {runES = run} :# _)) = ES {runES = run}
 
+extractAnnotation :: Except e (Annotated s (ExceptState e s a)) -> Except e (Annotated s a)
+extractAnnotation (Error e)                         = Error e
+extractAnnotation (Success (ES {runES = run} :# s)) = run s
+
 -- |Flattens two ExceptStates.
 joinExceptState :: ExceptState e s (ExceptState e s a) -> ExceptState e s a
-joinExceptState ES {runES = run} = ES {runES = \s -> runES (extractES (run s)) s}
+joinExceptState ES {runES = run} = ES {runES = \s -> extractAnnotation $ run s}
 
 -- |Returns ExceptState with runES function that applies 
 -- the given function to its argument wrapped in Success.
@@ -80,15 +84,11 @@ isDivision _          = False
 -- constructor - unary operation constructor
 evalUnary :: Expr -> (Double -> Prim Double) -> ExceptState EvaluationError [Prim Double] Double
 evalUnary x constructor = do
-  let result = runES (eval x) []
-  if isError result 
-  then ES {runES = \_ -> Error DivideByZero}
-  else do
-    let (Success (value :# lst)) = result
-    let newPrim                  = constructor value
-    let newState                 = modifyExceptState (++ newPrim : lst)
-    let calculatedValue          = calculateValue newPrim
-    mapExceptState (const calculatedValue) newState
+  value <- eval x
+  let newPrim = constructor value
+  modifyExceptState $ (:) newPrim
+  pure $ calculateValue newPrim
+
 
 -- |Evaluates expression with binary operation (Add, Sub, Mul, Div) 
 -- or returns ExceptState with error if division by zero occured in evaluation
@@ -97,23 +97,14 @@ evalUnary x constructor = do
 -- constructor - binary operation constructor
 evalBinary :: Expr -> Expr -> (Double -> Double -> Prim Double) -> ExceptState EvaluationError [Prim Double] Double
 evalBinary x y constructor = do
-  let resultX = runES (eval x) []
-  if isError resultX
-  then ES {runES = \_ -> Error DivideByZero}
-  else do
-    let Success (valueX :# lstX) = resultX
-    let resultY                  = runES (eval y) lstX
-    if isError resultY
-    then ES {runES = \_ -> Error DivideByZero}
-    else do
-      let Success (valueY :# lstY) = runES (eval y) lstX
-      if valueY == 0 && isDivision (constructor valueX valueY)
-      then ES {runES = \_ -> Error DivideByZero}
-      else do
-        let newPrim         = constructor valueX valueY
-        let newState        = modifyExceptState (++ newPrim : lstY)
-        let calculatedValue = calculateValue newPrim
-        mapExceptState (const calculatedValue) newState
+  valueX <- eval x
+  valueY <- eval y
+  let newPrim = constructor valueX valueY
+  if valueY == 0 && isDivision newPrim
+    then throwExceptState DivideByZero
+    else do 
+      modifyExceptState $ (:) newPrim
+      pure $ calculateValue newPrim
 
 -- |Evaluates expression and returns ExceptState with EvaluationError
 -- or with sequence of sub-evaluations and evaluated value.

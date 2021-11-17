@@ -1,7 +1,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE BlockArguments #-}
-module HW2.T6 
+module HW2.T6
   ( ParseError (..)
   , parseError
   , parseExpr
@@ -19,6 +19,7 @@ import HW2.T1 (Annotated (..), Except (..))
 import HW2.T4 (Expr (Op, Val), Prim (Mul, Div, Add, Sub))
 import HW2.T5 ( ExceptState(..) )
 import Data.Foldable
+import GHC.Float (int2Double)
 
 data ParseError = ErrorAtPos Natural
 
@@ -46,13 +47,13 @@ pChar = P $ ES \(pos, s) ->
 
 -- |Parser that always fails.
 parseError :: Parser a
-parseError = P $ ES \_ -> Error (ErrorAtPos 0)
+parseError = P $ ES \(pos, _) -> Error (ErrorAtPos pos)
 
 instance Alternative Parser where
   empty                       = parseError
-  p@(P pstate) <|> (P qstate) = P $ ES \(pos, s) -> case runP p s of
-    (Success _) -> runES pstate (pos, s)
-    (Error _)   -> runES qstate (pos, s)
+  (P pstate) <|> (P qstate) = P $ ES \(pos, s) -> case runES pstate (pos, s) of
+    (Error _) -> runES qstate (pos, s)
+    Success v -> Success v
 
 instance MonadPlus Parser
 
@@ -72,24 +73,48 @@ pDot = P $ ES \(pos, s) -> case s of
 stringToInteger :: Integer -> String -> Integer
 stringToInteger = foldl' (\acc d -> acc * 10 + toInteger (digitToInt d))
 
+pOpenBracket :: Parser ()
+pOpenBracket = P $ ES \(pos, s) -> case s of
+  ('(':cs) -> Success (() :# (pos + 1, cs))
+  _        -> Error (ErrorAtPos pos)
+
+pCloseBracket :: Parser ()
+pCloseBracket = P $ ES \(pos, s) -> case s of
+  (')':cs) -> Success (() :# (pos + 1, cs))
+  _        -> Error (ErrorAtPos pos)
+
+pParenthesis :: Parser Expr
+pParenthesis = do
+  pOpenBracket
+  expr <- pLowPriority
+  pCloseBracket
+  pure expr
+
 pDouble :: Parser Expr
 pDouble = do
-  first  <- some (mfilter Data.Char.isDigit pChar)
+  first <- some (mfilter Data.Char.isDigit pChar)
   pDot
   second <- some (mfilter Data.Char.isDigit pChar)
   let integralPart = stringToInteger 0 first
   let bothParts    = stringToInteger integralPart second
   pure $ Val $ toRealFloat $ scientific bothParts (- length second)
 
+pInteger :: Parser Expr
+pInteger = do
+  first <- some (mfilter Data.Char.isDigit pChar)
+  let value = stringToInteger 0 first
+  pure $ Val $ toRealFloat $ scientific value 0
+
+pNumber :: Parser Expr
+pNumber = pDouble <|> pInteger
+
 pWhiteSpace :: Parser ()
 pWhiteSpace = P $ ES \(pos, s) -> case s of
-  (c:cs) -> if isSpace c 
+  (c:cs) -> if isSpace c
     then
       Success (() :# (pos + 1, cs))
     else Error (ErrorAtPos pos)
   _      -> Error (ErrorAtPos pos)
-
-data HighPriorityOperator = Multiplication | Division
 
 pHighPriorityOperator :: Parser Char
 pHighPriorityOperator = P $ ES \(pos, s) -> case s of
@@ -106,19 +131,19 @@ getExprForOperator _ _ _   = undefined
 
 pHighPriority :: Parser Expr
 pHighPriority = do
-  x    <- pWhiteSpace *> pDouble
+  x    <- many pWhiteSpace *> (pParenthesis <|> pNumber)
   expr <- many pHighPriority'
   pure $ foldl' (flip id) x expr
-    where 
+    where
       -- |pHighPriority' returns a function that takes an argument 
       -- and depending on the operator returns Mul or Div with
       -- the the given argument as the first value.
       -- Example:
       -- "many pHighPriority'" for *5/10 will result in
       -- [\x -> Op (Mul x 5), \x -> Op (Div x 10)].
-      pHighPriority' = do 
-        operator <- pWhiteSpace *> pHighPriorityOperator
-        y        <- pWhiteSpace *> pDouble
+      pHighPriority' = do
+        operator <- many pWhiteSpace *> pHighPriorityOperator
+        y        <- many pWhiteSpace *> (pParenthesis <|> pNumber)
         pure $ getExprForOperator operator y
 
 pLowPriorityOperator :: Parser Char
@@ -129,19 +154,20 @@ pLowPriorityOperator = P $ ES \(pos, s) -> case s of
 
 pLowPriority :: Parser Expr
 pLowPriority = do
-  x    <- pWhiteSpace *> pHighPriority
+  x    <- many pWhiteSpace *> pHighPriority
   expr <- many pLowPriority'
   pure $ foldl' (flip id) x expr
-    where 
-      pLowPriority' = do 
-        operator <- pWhiteSpace *> pLowPriorityOperator
-        y        <- pWhiteSpace *> pHighPriority
+    where
+      pLowPriority' = do
+        operator <- many pWhiteSpace *> pLowPriorityOperator
+        y        <- many pWhiteSpace *> pHighPriority
         pure $ getExprForOperator operator y
 
--- |Main parser that parses thw whole expression.
+-- |Main parser that parses the whole expression.
 pExpression :: Parser Expr
 pExpression = do
   expr <- pLowPriority
+  _ <- many pWhiteSpace
   pEof
   pure expr
 
