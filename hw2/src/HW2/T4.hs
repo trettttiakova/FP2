@@ -38,9 +38,13 @@ getAnnotatedValue (a :# _) = a
 getRunS :: State s a -> (s -> Annotated s a)
 getRunS S {runS = run} = run
 
+getAnnotationValue :: Annotated s a -> s
+getAnnotationValue (_ :# s) = s
+
 -- |Flattens two nested States. 
 joinState :: State s (State s a) -> State s a
-joinState S {runS = run} = S {runS = \s -> getRunS (getAnnotatedValue $ run s) s}
+joinState S {runS = run} = S {runS = \s 
+  -> getRunS (getAnnotatedValue $ run s) (getAnnotationValue $ run s)}
 
 -- |Returns State with runS function that applies 
 -- the given function to its argument.
