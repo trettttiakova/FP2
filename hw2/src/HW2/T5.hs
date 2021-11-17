@@ -35,9 +35,13 @@ extractES :: Except e (Annotated s (ExceptState e s a)) -> ExceptState e s a
 extractES (Error e) = ES {runES = \_ -> Error e}
 extractES (Success (ES {runES = run} :# _)) = ES {runES = run}
 
+extractAnnotation :: Except e (Annotated s (ExceptState e s a)) -> Except e (Annotated s a)
+extractAnnotation (Error e)                         = Error e
+extractAnnotation (Success (ES {runES = run} :# s)) = run s
+
 -- |Flattens two ExceptStates.
 joinExceptState :: ExceptState e s (ExceptState e s a) -> ExceptState e s a
-joinExceptState ES {runES = run} = ES {runES = \s -> runES (extractES (run s)) s}
+joinExceptState ES {runES = run} = ES {runES = \s -> extractAnnotation $ run s}
 
 -- |Returns ExceptState with runES function that applies 
 -- the given function to its argument wrapped in Success.
