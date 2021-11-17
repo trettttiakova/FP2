@@ -1,0 +1,73 @@
+{
+  "tests": [
+    {
+      "name": "Submit code",
+      "run": "test -f \"hw2/hw2.cabal\"",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 3,
+      "points": 1
+    },
+    {
+      "name": "Task 1",
+      "setup": "",
+      "run": "hw-checker -d hw2 -t 1",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 1
+    },
+    {
+      "name": "Task 2",
+      "setup": "",
+      "run": "hw-checker -d hw2 -t 2",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 1
+    },
+    {
+      "name": "Task 3",
+      "setup": "",
+      "run": "hw-checker -d hw2 -t 3",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 1
+    },
+    {
+      "name": "Task 4",
+      "setup": "",
+      "run": "hw-checker -d hw2 -t 4",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 1
+    },
+    {
+      "name": "Task 5",
+      "setup": "",
+      "run": "hw-checker -d hw2 -t 5",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 1
+    },
+    {
+      "name": "Task 6",
+      "setup": "",
+      "run": "hw-checker -d hw2 -t 6",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 1
+    }
+  ]
+}
