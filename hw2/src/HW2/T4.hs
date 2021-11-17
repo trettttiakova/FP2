@@ -100,7 +100,7 @@ evalUnary x constructor = do
   value <- eval x
   let newPrim = constructor value
   modifyState $ (:) newPrim
-  return $ calculateValue newPrim
+  pure $ calculateValue newPrim
 
 -- |Evaluates expression with binary operation (Add, Sub, Mul, Div).
 -- It takes three arguments:
@@ -112,7 +112,7 @@ evalBinary x y constructor = do
   valueY <- eval y
   let newPrim = constructor valueX valueY
   modifyState $ (:) newPrim
-  return $ calculateValue newPrim
+  pure $ calculateValue newPrim
 
 -- |Evaluates expression and returns State 
 -- with sequence of sub-evaluations and evaluated value.
