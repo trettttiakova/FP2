@@ -51,9 +51,9 @@ parseError = P $ ES \(pos, _) -> Error (ErrorAtPos pos)
 
 instance Alternative Parser where
   empty                       = parseError
-  p@(P pstate) <|> (P qstate) = P $ ES \(pos, s) -> case runP p s of
-    (Success _) -> runES pstate (pos, s)
-    (Error _)   -> runES qstate (pos, s)
+  (P pstate) <|> (P qstate) = P $ ES \(pos, s) -> case runES pstate (pos, s) of
+    (Error _) -> runES qstate (pos, s)
+    Success v -> Success v
 
 instance MonadPlus Parser
 
@@ -86,7 +86,7 @@ pCloseBracket = P $ ES \(pos, s) -> case s of
 pParenthesis :: Parser Expr
 pParenthesis = do
   pOpenBracket
-  expr <- pExpression
+  expr <- pLowPriority
   pCloseBracket
   pure expr
 
