@@ -167,6 +167,7 @@ pLowPriority = do
 pExpression :: Parser Expr
 pExpression = do
   expr <- pLowPriority
+  _ <- many pWhiteSpace
   pEof
   pure expr
 
