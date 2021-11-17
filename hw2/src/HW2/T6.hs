@@ -131,7 +131,7 @@ getExprForOperator _ _ _   = undefined
 
 pHighPriority :: Parser Expr
 pHighPriority = do
-  x    <- many pWhiteSpace *> (pNumber <|> pParenthesis)
+  x    <- many pWhiteSpace *> (pParenthesis <|> pNumber)
   expr <- many pHighPriority'
   pure $ foldl' (flip id) x expr
     where
@@ -143,7 +143,7 @@ pHighPriority = do
       -- [\x -> Op (Mul x 5), \x -> Op (Div x 10)].
       pHighPriority' = do
         operator <- many pWhiteSpace *> pHighPriorityOperator
-        y        <- many pWhiteSpace *> (pNumber <|> pParenthesis)
+        y        <- many pWhiteSpace *> (pParenthesis <|> pNumber)
         pure $ getExprForOperator operator y
 
 pLowPriorityOperator :: Parser Char
