@@ -19,6 +19,7 @@ import HW2.T1 (Annotated (..), Except (..))
 import HW2.T4 (Expr (Op, Val), Prim (Mul, Div, Add, Sub))
 import HW2.T5 ( ExceptState(..) )
 import Data.Foldable
+import GHC.Float (int2Double)
 
 data ParseError = ErrorAtPos Natural
 
@@ -46,7 +47,7 @@ pChar = P $ ES \(pos, s) ->
 
 -- |Parser that always fails.
 parseError :: Parser a
-parseError = P $ ES \_ -> Error (ErrorAtPos 0)
+parseError = P $ ES \(pos, _) -> Error (ErrorAtPos pos)
 
 instance Alternative Parser where
   empty                       = parseError
@@ -72,14 +73,40 @@ pDot = P $ ES \(pos, s) -> case s of
 stringToInteger :: Integer -> String -> Integer
 stringToInteger = foldl' (\acc d -> acc * 10 + toInteger (digitToInt d))
 
+pOpenBracket :: Parser ()
+pOpenBracket = P $ ES \(pos, s) -> case s of
+  ('(':cs) -> Success (() :# (pos + 1, cs))
+  _        -> Error (ErrorAtPos pos)
+
+pCloseBracket :: Parser ()
+pCloseBracket = P $ ES \(pos, s) -> case s of
+  (')':cs) -> Success (() :# (pos + 1, cs))
+  _        -> Error (ErrorAtPos pos)
+
+pParenthesis :: Parser Expr
+pParenthesis = do
+  pOpenBracket
+  expr <- pExpression
+  pCloseBracket
+  pure expr
+
 pDouble :: Parser Expr
 pDouble = do
-  first  <- some (mfilter Data.Char.isDigit pChar)
+  first <- some (mfilter Data.Char.isDigit pChar)
   pDot
   second <- some (mfilter Data.Char.isDigit pChar)
   let integralPart = stringToInteger 0 first
   let bothParts    = stringToInteger integralPart second
   pure $ Val $ toRealFloat $ scientific bothParts (- length second)
+
+pInteger :: Parser Expr
+pInteger = do
+  first  <- some (mfilter Data.Char.isDigit pChar)
+  let value = stringToInteger 0 first
+  pure $ Val $ toRealFloat $ scientific value 0
+
+pNumber :: Parser Expr
+pNumber = pDouble <|> pInteger
 
 pWhiteSpace :: Parser ()
 pWhiteSpace = P $ ES \(pos, s) -> case s of
@@ -106,7 +133,7 @@ getExprForOperator _ _ _   = undefined
 
 pHighPriority :: Parser Expr
 pHighPriority = do
-  x    <- pWhiteSpace *> pDouble
+  x    <- pWhiteSpace *> (pNumber <|> pParenthesis)
   expr <- many pHighPriority'
   pure $ foldl' (flip id) x expr
     where 
@@ -118,7 +145,7 @@ pHighPriority = do
       -- [\x -> Op (Mul x 5), \x -> Op (Div x 10)].
       pHighPriority' = do 
         operator <- pWhiteSpace *> pHighPriorityOperator
-        y        <- pWhiteSpace *> pDouble
+        y        <- pWhiteSpace *> (pNumber <|> pParenthesis)
         pure $ getExprForOperator operator y
 
 pLowPriorityOperator :: Parser Char
@@ -138,7 +165,7 @@ pLowPriority = do
         y        <- pWhiteSpace *> pHighPriority
         pure $ getExprForOperator operator y
 
--- |Main parser that parses thw whole expression.
+-- |Main parser that parses the whole expression.
 pExpression :: Parser Expr
 pExpression = do
   expr <- pLowPriority
