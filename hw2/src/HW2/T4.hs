@@ -97,11 +97,10 @@ calculateValue (Sgn x)   = signum x
 -- constructor - unary operation constructor
 evalUnary :: Expr -> (Double -> Prim Double) -> State [Prim Double] Double
 evalUnary x constructor = do
-  let (value :# lst)  = runS (eval x) []
-  let newPrim         = constructor value
-  let newState        = modifyState (++ newPrim : lst)
-  let calculatedValue = calculateValue newPrim
-  mapState (const calculatedValue) newState
+  value <- eval x
+  let newPrim = constructor value
+  modifyState $ (:) newPrim
+  return $ calculateValue newPrim
 
 -- |Evaluates expression with binary operation (Add, Sub, Mul, Div).
 -- It takes three arguments:
@@ -109,12 +108,11 @@ evalUnary x constructor = do
 -- constructor - binary operation constructor
 evalBinary :: Expr -> Expr -> (Double -> Double -> Prim Double) -> State [Prim Double] Double
 evalBinary x y constructor = do
-  let (valueX :# lstX)  = runS (eval x) []
-  let (valueY :# lstY)  = runS (eval y) lstX
-  let newPrim           = constructor valueX valueY
-  let newState          = modifyState (++ newPrim : lstY)
-  let calculatedValue   = calculateValue newPrim
-  mapState (const calculatedValue) newState
+  valueX <- eval x
+  valueY <- eval y
+  let newPrim = constructor valueX valueY
+  modifyState $ (:) newPrim
+  return $ calculateValue newPrim
 
 -- |Evaluates expression and returns State 
 -- with sequence of sub-evaluations and evaluated value.
