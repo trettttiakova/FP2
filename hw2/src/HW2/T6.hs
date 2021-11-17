@@ -1,7 +1,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE BlockArguments #-}
-module HW2.T6 
+module HW2.T6
   ( ParseError (..)
   , parseError
   , parseExpr
@@ -101,7 +101,7 @@ pDouble = do
 
 pInteger :: Parser Expr
 pInteger = do
-  first  <- some (mfilter Data.Char.isDigit pChar)
+  first <- some (mfilter Data.Char.isDigit pChar)
   let value = stringToInteger 0 first
   pure $ Val $ toRealFloat $ scientific value 0
 
@@ -110,13 +110,11 @@ pNumber = pDouble <|> pInteger
 
 pWhiteSpace :: Parser ()
 pWhiteSpace = P $ ES \(pos, s) -> case s of
-  (c:cs) -> if isSpace c 
+  (c:cs) -> if isSpace c
     then
       Success (() :# (pos + 1, cs))
     else Error (ErrorAtPos pos)
   _      -> Error (ErrorAtPos pos)
-
-data HighPriorityOperator = Multiplication | Division
 
 pHighPriorityOperator :: Parser Char
 pHighPriorityOperator = P $ ES \(pos, s) -> case s of
@@ -133,19 +131,19 @@ getExprForOperator _ _ _   = undefined
 
 pHighPriority :: Parser Expr
 pHighPriority = do
-  x    <- pWhiteSpace *> (pNumber <|> pParenthesis)
+  x    <- many pWhiteSpace *> (pNumber <|> pParenthesis)
   expr <- many pHighPriority'
   pure $ foldl' (flip id) x expr
-    where 
+    where
       -- |pHighPriority' returns a function that takes an argument 
       -- and depending on the operator returns Mul or Div with
       -- the the given argument as the first value.
       -- Example:
       -- "many pHighPriority'" for *5/10 will result in
       -- [\x -> Op (Mul x 5), \x -> Op (Div x 10)].
-      pHighPriority' = do 
-        operator <- pWhiteSpace *> pHighPriorityOperator
-        y        <- pWhiteSpace *> (pNumber <|> pParenthesis)
+      pHighPriority' = do
+        operator <- many pWhiteSpace *> pHighPriorityOperator
+        y        <- many pWhiteSpace *> (pNumber <|> pParenthesis)
         pure $ getExprForOperator operator y
 
 pLowPriorityOperator :: Parser Char
@@ -156,13 +154,13 @@ pLowPriorityOperator = P $ ES \(pos, s) -> case s of
 
 pLowPriority :: Parser Expr
 pLowPriority = do
-  x    <- pWhiteSpace *> pHighPriority
+  x    <- many pWhiteSpace *> pHighPriority
   expr <- many pLowPriority'
   pure $ foldl' (flip id) x expr
-    where 
-      pLowPriority' = do 
-        operator <- pWhiteSpace *> pLowPriorityOperator
-        y        <- pWhiteSpace *> pHighPriority
+    where
+      pLowPriority' = do
+        operator <- many pWhiteSpace *> pLowPriorityOperator
+        y        <- many pWhiteSpace *> pHighPriority
         pure $ getExprForOperator operator y
 
 -- |Main parser that parses the whole expression.
